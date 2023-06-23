@@ -29,26 +29,23 @@ log = getLogger("bot.approver")
 
 
 def _mi2str(inc: IncReq) -> str:
-    return "%s:%s:%s" % (OBS_MAINT_PRJ, str(inc.inc), str(inc.req))
+    return f"{OBS_MAINT_PRJ}:{str(inc.inc)}:{str(inc.req)}"
 
 
 def _handle_http_error(e: HTTPError, inc: IncReq) -> bool:
     if e.code == 403:
         log.info(
-            "Received '%s'. Request %s likely already approved, ignoring"
-            % (e.reason, inc.req)
+            f"Received '{e.reason}'. Request {inc.req} likely already approved, ignoring"
         )
         return True
     elif e.code == 404:
         log.info(
-            "Received '%s'. Request %s removed or problem on OBS side, ignoring"
-            % (e.reason, inc.req)
+            f"Received '{e.reason}'. Request {inc.req} removed or problem on OBS side, ignoring"
         )
         return False
     else:
         log.error(
-            "Received error %s, reason: '%s' for Request %s - problem on OBS side"
-            % (e.code, e.reason, inc.req)
+            f"Received error {e.code}, reason: '{e.reason}' for Request {inc.req} - problem on OBS side"
         )
         return False
 
@@ -57,7 +54,7 @@ class Approver:
     def __init__(self, args: Namespace) -> None:
         self.dry = args.dry
         self.single_incident = args.incident
-        self.token = {"Authorization": "Token {}".format(args.token)}
+        self.token = {"Authorization": f"Token {args.token}"}
         self.all_incidents = args.all_incidents
         self.client = openQAInterface(args)
 
@@ -74,7 +71,7 @@ class Approver:
 
         log.info("Incidents to approve:")
         for inc in incidents_to_approve:
-            log.info("* %s" % _mi2str(inc))
+            log.info(f"* {_mi2str(inc)}")
 
         if not self.dry:
             osc.conf.get_config(override_apiurl=OBS_URL)
@@ -97,20 +94,18 @@ class Approver:
             log.info(e)
 
             if any(i.withAggregate for i in i_jobs):
-                log.info("Aggregate missing for %s" % _mi2str(inc))
+                log.info(f"Aggregate missing for {_mi2str(inc)}")
                 return False
 
             u_jobs = []
 
         if not self.get_incident_result(i_jobs, "api/jobs/incident/", inc.inc):
-            log.info("%s has at least one failed job in incident tests" % _mi2str(inc))
+            log.info(f"{_mi2str(inc)} has at least one failed job in incident tests")
             return False
 
         if any(i.withAggregate for i in i_jobs):
             if not self.get_incident_result(u_jobs, "api/jobs/update/", inc.inc):
-                log.info(
-                    "%s has at least one failed job in aggregate tests" % _mi2str(inc)
-                )
+                log.info(f"{_mi2str(inc)} has at least one failed job in aggregate tests")
                 return False
 
         # everything is green --> add incident to approve list
@@ -140,21 +135,18 @@ class Approver:
                 continue
             if self.is_job_marked_acceptable_for_incident(res["job_id"], inc):
                 log.info(
-                    "Ignoring failed job %s/t%s for incident %s due to openQA comment"
-                    % (str(self.client.url.geturl()), res["job_id"], inc)
+                    f'Ignoring failed job {str(self.client.url.geturl())}/t{res["job_id"]} for incident {inc} due to openQA comment'
                 )
                 res["status"] = "passed"
             else:
                 log.info(
-                    "Found failed, not-ignored job %s/t%s for incident %s"
-                    % (str(self.client.url.geturl()), res["job_id"], inc)
+                    f'Found failed, not-ignored job {str(self.client.url.geturl())}/t{res["job_id"]} for incident {inc}'
                 )
                 break
 
         if not results:
             raise NoResultsError(
-                "Job setting %s not found for incident %s"
-                % (str(job_aggr.id), str(inc))
+                f"Job setting {str(job_aggr.id)} not found for incident {inc}"
             )
 
         return all(r["status"] == "passed" for r in results)
@@ -175,13 +167,13 @@ class Approver:
 
     @staticmethod
     def osc_approve(inc: IncReq) -> bool:
-        msg = (
-            "Request accepted for '" + OBS_GROUP + "' based on data in " + QEM_DASHBOARD
-        )
+        msg = f"Request accepted for '{OBS_GROUP}' based on data in {QEM_DASHBOARD}"
         log.info(
-            "Accepting review for "
-            + OBS_MAINT_PRJ
-            + ":%s:%s" % (str(inc.inc), str(inc.req))
+            (
+                "Accepting review for "
+                + OBS_MAINT_PRJ
+                + f":{str(inc.inc)}:{str(inc.req)}"
+            )
         )
 
         try:

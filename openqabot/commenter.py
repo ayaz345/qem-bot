@@ -22,7 +22,7 @@ log = getLogger("bot.commenter")
 class Commenter:
     def __init__(self, args: Namespace) -> None:
         self.dry = args.dry
-        self.token = {"Authorization": "Token {}".format(args.token)}
+        self.token = {"Authorization": f"Token {args.token}"}
         self.client = openQAInterface(args)
         self.incidents = get_incidents(self.token)
         osc.conf.get_config(override_apiurl=OBS_URL)
@@ -44,15 +44,14 @@ class Commenter:
 
             state = "none"
             if any(j["status"] in ["running"] for j in i_jobs + u_jobs):
-                log.info("%s needs to wait a bit longer" % inc)
-            else:
-                if any(
+                log.info(f"{inc} needs to wait a bit longer")
+            elif any(
                     j["status"] not in ["passed", "softfailed"] for j in i_jobs + u_jobs
                 ):
-                    log.info("There is a failed job for %s" % inc)
-                    state = "failed"
-                else:
-                    state = "passed"
+                log.info(f"There is a failed job for {inc}")
+                state = "failed"
+            else:
+                state = "passed"
 
             msg = self.summarize_message(i_jobs + u_jobs)
             self.osc_comment(inc, msg, state)
@@ -68,14 +67,11 @@ class Commenter:
             log.debug("Skipping empty comment")
             return
 
-        kw = {}
-        kw["request_id"] = str(inc.rr)
-
+        kw = {"request_id": str(inc.rr)}
         bot_name = "openqa"
-        info = {}
-        info["state"] = state
+        info = {"state": state}
         for key in inc.revisions.keys():
-            info["revision_%s_%s" % (key.version, key.arch)] = inc.revisions[key]
+            info[f"revision_{key.version}_{key.arch}"] = inc.revisions[key]
 
         msg = self.commentapi.add_marker(msg, bot_name, info)
         msg = self.commentapi.truncate(msg.strip())
@@ -95,16 +91,15 @@ class Commenter:
 
         if comment is None:
             log.debug("No comment to replace found")
-        else:
-            if not self.dry:
-                self.commentapi.delete(comment["id"])
-            else:
-                log.info("Would delete comment %d" % int(comment["id"]))
+        elif self.dry:
+            log.info("Would delete comment %d" % int(comment["id"]))
 
+        else:
+            self.commentapi.delete(comment["id"])
         if not self.dry:
             self.commentapi.add_comment(comment=msg, **kw)
         else:
-            log.info("Would write comment to request %s" % inc)
+            log.info(f"Would write comment to request {inc}")
             log.debug(pformat(msg))
 
     def summarize_message(self, jobs) -> str:
@@ -174,7 +169,7 @@ class Commenter:
         testurl = osc.core.makeurl(
             self.client.openqa.baseurl, ["tests", str(job["job_id"])]
         )
-        if not job["status"] in ["passed", "failed", "softfailed"]:
+        if job["status"] not in ["passed", "failed", "softfailed"]:
             rstring = job["status"]
             if rstring == "none":
                 return None

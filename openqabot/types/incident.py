@@ -16,8 +16,8 @@ class Incident:
     def __init__(self, incident):
         self.rr = incident["rr_number"]
         self.project = incident["project"]
-        self.id = incident["number"]
         self.rrid = f"{self.project}:{self.rr}" if self.rr else None
+        self.id = incident["number"]
         self.staging = not incident["inReview"]
 
         self.channels = [
@@ -53,10 +53,8 @@ class Incident:
         self.channels = [
             chan
             for chan in self.channels
-            if not (
-                chan.product == "SLE-Module-SUSE-Manager-Server"
-                and chan.arch == "aarch64"
-            )
+            if chan.product != "SLE-Module-SUSE-Manager-Server"
+            or chan.arch != "aarch64"
         ]
 
         if not self.channels:
@@ -77,9 +75,8 @@ class Incident:
 
         for repo in channels:
             version = repo.version
-            v = re.match(version_pattern, repo.version)
-            if v:
-                version = v.group(0)
+            if v := re.match(version_pattern, repo.version):
+                version = v[0]
 
             if ArchVer(repo.arch, version) in tmpdict:
                 tmpdict[ArchVer(repo.arch, version)].append(

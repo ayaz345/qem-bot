@@ -19,9 +19,9 @@ class OpenQABot:
         log.info("Bot schedule starts now")
         self.dry = args.dry
         self.ignore_onetime = args.ignore_onetime
-        self.token = {"Authorization": "Token " + args.token}
+        self.token = {"Authorization": f"Token {args.token}"}
         self.incidents = get_incidents(self.token)
-        log.info("%s incidents loaded from qem dashboard" % len(self.incidents))
+        log.info(f"{len(self.incidents)} incidents loaded from qem dashboard")
 
         extrasettings = get_onearch(args.singlearch)
 
@@ -35,8 +35,7 @@ class OpenQABot:
     def post_qem(self, data, api) -> None:
         if not self.openqa:
             log.warning(
-                "No valid openQA configuration specified: '%s' not posted to dashboard"
-                % data
+                f"No valid openQA configuration specified: '{data}' not posted to dashboard"
             )
             return
 
@@ -44,8 +43,7 @@ class OpenQABot:
         try:
             res = requests.put(url, headers=self.token, json=data)
             log.info(
-                "Put to dashboard result %s, database id: %s"
-                % (res.status_code, res.json().get("id", "No id?"))
+                f'Put to dashboard result {res.status_code}, database id: {res.json().get("id", "No id?")}'
             )
         except Exception as e:
             log.exception(e)
@@ -61,19 +59,18 @@ class OpenQABot:
             post += worker(self.incidents, self.token, self.ci, self.ignore_onetime)
 
         if self.dry:
-            log.info("Would trigger %s products in openQA" % len(post))
+            log.info(f"Would trigger {len(post)} products in openQA")
             for job in post:
                 log.info(job)
 
         else:
-            log.info("Triggering %s products in openQA" % len(post))
+            log.info(f"Triggering {len(post)} products in openQA")
             for job in post:
-                log.info("Triggering %s" % str(job))
+                log.info(f"Triggering {str(job)}")
                 try:
                     self.post_openqa(job["openqa"])
                 except PostOpenQAError:
                     log.info("POST failed, not updating dashboard")
-                    pass
                 else:
                     self.post_qem(job["qem"], job["api"])
 

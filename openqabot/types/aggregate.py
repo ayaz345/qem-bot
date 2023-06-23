@@ -66,9 +66,7 @@ class Aggregate(BaseConf):
         ret = []
 
         for arch in self.archs:
-            full_post: Dict["str", Any] = {}
-            full_post["openqa"] = {}
-            full_post["qem"] = {}
+            full_post: Dict["str", Any] = {"openqa": {}, "qem": {}}
             full_post["qem"]["incidents"] = []
             full_post["qem"]["settings"] = {}
             full_post["api"] = "api/update_settings"
@@ -107,15 +105,16 @@ class Aggregate(BaseConf):
 
             full_post["openqa"]["REPOHASH"] = merge_repohash(
                 sorted(
-                    set(
-                        str(inc) for inc in chain.from_iterable(test_incidents.values())
-                    )
+                    {
+                        str(inc)
+                        for inc in chain.from_iterable(test_incidents.values())
+                    }
                 )
             )
 
             try:
                 old_jobs = requests.get(
-                    QEM_DASHBOARD + "api/update_settings",
+                    f"{QEM_DASHBOARD}api/update_settings",
                     params={"product": self.product, "arch": arch},
                     headers=token,
                 ).json()
@@ -131,10 +130,7 @@ class Aggregate(BaseConf):
                     full_post["openqa"]["REPOHASH"], old_repohash, old_build
                 )
             except SameBuildExists:
-                log.info(
-                    "For %s aggreagate on %s there is existing build"
-                    % (self.product, arch)
-                )
+                log.info(f"For {self.product} aggreagate on {arch} there is existing build")
                 continue
 
             if not ignore_onetime and (

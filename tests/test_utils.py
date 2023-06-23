@@ -12,7 +12,7 @@ try:
 except ImportError as e:
     import logging
 
-    logging.info(str(e) + ": Likely older python version")
+    logging.info(f"{str(e)}: Likely older python version")
 
 from openqabot.utils import walk, normalize_results, retry3
 

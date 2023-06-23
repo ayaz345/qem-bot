@@ -18,15 +18,13 @@ def fetch_matching_link(url, regex):
     try:
         # Note: ?C=M;O=A - C - compare , M - modify time , O - order , A - asc
         # So, the first link matching the regex is the most recent one
-        req = requests.get(url + "/?C=M;O=A")
+        req = requests.get(f"{url}/?C=M;O=A")
         text = req.text
     except BaseException as err:
-        log.error("error fetching '%s': %s" % (url, err))
+        log.error(f"error fetching '{url}': {err}")
         return None
     getpage_soup = bs4.BeautifulSoup(text, "html.parser")
-    # Returns lazy iterator, so
-    links = getpage_soup.findAll("a", href=regex)
-    if links:
+    if links := getpage_soup.findAll("a", href=regex):
         return f"{url}/{links[0].get('href')}"
     raise ValueError("No matching links found")
 
@@ -45,10 +43,14 @@ def get_latest_tools_image(query):
 
     ## Get the first not-failing item
     build_results = requests.get(query).json()["build_results"]
-    for build in build_results:
-        if build["failed"] == 0:
-            return "publiccloud_tools_{}.qcow2".format(build["build"])
-    return None
+    return next(
+        (
+            f'publiccloud_tools_{build["build"]}.qcow2'
+            for build in build_results
+            if build["failed"] == 0
+        ),
+        None,
+    )
 
 
 # Applies PUBLIC_CLOUD_IMAGE_LOCATION based on the given PUBLIC_CLOUD_IMAGE_REGEX

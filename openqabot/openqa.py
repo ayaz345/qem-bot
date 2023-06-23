@@ -31,42 +31,36 @@ class openQAInterface:
 
     def post_job(self, settings) -> None:
         log.info(
-            "openqa-cli api --host %s -X post isos %s"
-            % (
-                self.url.geturl(),
-                " ".join(["%s=%s" % (k, v) for k, v in settings.items()]),
-            )
+            f'openqa-cli api --host {self.url.geturl()} -X post isos {" ".join([f"{k}={v}" for k, v in settings.items()])}'
         )
         try:
             self.openqa.openqa_request(
                 "POST", "isos", data=settings, retries=self.retries
             )
         except RequestError as e:
-            log.error("openQA returned %s" % e.args[-1])
-            log.error("Post failed with {}".format(pformat(settings)))
+            log.error(f"openQA returned {e.args[-1]}")
+            log.error(f"Post failed with {pformat(settings)}")
             raise PostOpenQAError
         except Exception as e:
             log.exception(e)
-            log.error("Post failed with {}".format(pformat(settings)))
+            log.error(f"Post failed with {pformat(settings)}")
             raise PostOpenQAError
 
     def handle_job_not_found(self, job_id: int):
-        log.info(
-            "Job %s not found in openQA, marking as obsolete on dashboard" % job_id
-        )
+        log.info(f"Job {job_id} not found in openQA, marking as obsolete on dashboard")
         update_job(self.qem_token, job_id, {"obsolete": True})
 
     def get_jobs(self, data: Data):
-        log.info("Getting openQA tests results for %s" % pformat(data))
-        param = {}
-        param["scope"] = "relevant"
-        param["latest"] = "1"
-        param["flavor"] = data.flavor
-        param["distri"] = data.distri
-        param["build"] = data.build
-        param["version"] = data.version
-        param["arch"] = data.arch
-
+        log.info(f"Getting openQA tests results for {pformat(data)}")
+        param = {
+            "scope": "relevant",
+            "latest": "1",
+            "flavor": data.flavor,
+            "distri": data.distri,
+            "build": data.build,
+            "version": data.version,
+            "arch": data.arch,
+        }
         ret = None
         try:
             ret = self.openqa.openqa_request("GET", "jobs", param)["jobs"]
@@ -80,7 +74,7 @@ class openQAInterface:
         ret = []
         try:
             ret = self.openqa.openqa_request(
-                "GET", "jobs/%s/comments" % job_id, retries=self.retries
+                "GET", f"jobs/{job_id}/comments", retries=self.retries
             )
             ret = list(map(lambda c: {"text": c.get("text", "")}, ret))
         except Exception as e:

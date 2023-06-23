@@ -48,7 +48,7 @@ class CommentAPI(object):
         :param comment_element: XML element that store a comment.
         :returns: A Python dictionary object.
         """
-        comment = {
+        return {
             "who": comment_element.get("who"),
             "when": datetime.strptime(
                 comment_element.get("when"), "%Y-%m-%d %H:%M:%S %Z"
@@ -57,7 +57,6 @@ class CommentAPI(object):
             "parent": comment_element.get("parent", None),
             "comment": comment_element.text,
         }
-        return comment
 
     def get_comments(self, request_id=None, project_name=None, package_name=None):
         """Get the list of comments of an object in OBS.
@@ -84,21 +83,17 @@ class CommentAPI(object):
             if m and bot == m.group("bot").lower():
                 info = {}
 
-                # Python base regex does not support repeated subgroup capture
-                # so parse the optional info using string split.
-                stripped = m.group("info").strip()
-                if stripped:
+                if stripped := m.group("info").strip():
                     for pair in stripped.split(" "):
                         key, value = pair.split("=")
                         info[key] = value
 
                 # Skip if info does not match.
                 if info_match:
-                    match = True
-                    for key, value in list(info_match.items()):
-                        if not (value is None or (key in info and info[key] == value)):
-                            match = False
-                            break
+                    match = all(
+                        (value is None or (key in info and info[key] == value))
+                        for key, value in list(info_match.items())
+                    )
                     if not match:
                         continue
 
@@ -124,10 +119,10 @@ class CommentAPI(object):
             if not match:
                 continue
 
-            if match.group("user") != user:
+            if match["user"] != user:
                 continue
 
-            args = match.group("args").strip().split(" ")
+            args = match["args"].strip().split(" ")
             if command and (args[0] or None) != command:
                 continue
 
@@ -137,11 +132,8 @@ class CommentAPI(object):
         """Add bot marker to comment that can be used to find comment."""
 
         if info:
-            infos = []
-            for key, value in info.items():
-                infos.append("=".join((str(key), str(value))))
-
-        marker = "<!-- {}{} -->".format(bot, " " + " ".join(infos) if info else "")
+            infos = ["=".join((str(key), str(value))) for key, value in info.items()]
+        marker = f'<!-- {bot}{" " + " ".join(infos) if info else ""} -->'
         return marker + "\n\n" + comment
 
     def remove_marker(self, comment):
@@ -223,11 +215,11 @@ class CommentAPI(object):
         :param comments dict of id->comment dict
         :return same hash without the deleted comments
         """
-        parents = []
-        for comment in list(comments.values()):
-            if comment["parent"]:
-                parents.append(comment["parent"])
-
+        parents = [
+            comment["parent"]
+            for comment in list(comments.values())
+            if comment["parent"]
+        ]
         for comment in list(comments.values()):
             if comment["id"] not in parents:
                 # Parent comments that have been removed are still returned

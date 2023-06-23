@@ -147,7 +147,7 @@ def get_active_incidents() -> Set[int]:
         if has_next:
             cursor = incidents["pageInfo"]["endCursor"]
 
-    log.info("Loaded %s active incidents" % len(active))
+    log.info(f"Loaded {len(active)} active incidents")
 
     return active
 
@@ -155,16 +155,16 @@ def get_active_incidents() -> Set[int]:
 def get_incident(incident: int):
     query = INCIDENT % {"incident": incident}
 
-    log.info("Getting info about incident %s from SMELT" % incident)
+    log.info(f"Getting info about incident {incident} from SMELT")
     inc_result = get_json(query)
     try:
         validate(instance=inc_result, schema=INCIDENT_SCHEMA)
         inc_result = walk(inc_result["data"]["incidents"]["edges"][0]["node"])
     except ValidationError as e:
-        log.exception("Invalid data from SMELT for incident %s" % incident)
+        log.exception(f"Invalid data from SMELT for incident {incident}")
         return None
     except Exception as e:
-        log.error("Unknown error for incident %s" % incident)
+        log.error(f"Unknown error for incident {incident}")
         log.exception(e)
         return None
 
@@ -177,8 +177,5 @@ def get_incidents(active: Set[int]) -> List[Any]:
     with CT.ThreadPoolExecutor() as executor:
         future_inc = [executor.submit(get_incident, inc) for inc in active]
 
-        for future in CT.as_completed(future_inc):
-            incidents.append(future.result())
-
-    incidents = [inc for inc in incidents if inc]
-    return incidents
+        incidents.extend(future.result() for future in CT.as_completed(future_inc))
+    return [inc for inc in incidents if inc]

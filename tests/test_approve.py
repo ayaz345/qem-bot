@@ -61,7 +61,9 @@ def fake_responses_for_unblocking_incidents_via_openqa_comments(request):
     responses.add(
         responses.GET,
         url="http://instance.qa/api/v1/jobs/100002/comments",
-        json=[{"text": "@review:acceptable_for:incident_%s:foo" % request.param}],
+        json=[
+            {"text": f"@review:acceptable_for:incident_{request.param}:foo"}
+        ],
     )
 
 
@@ -415,7 +417,7 @@ def test_osc_all_pass(fake_qem, fake_two_passed_jobs, f_osconf, caplog, monkeypa
 def fake_incident_1_failed_2_passed(request):
     responses.add(
         responses.GET,
-        "http://dashboard.qam.suse.de/api/jobs/incident/%s" % request.param,
+        f"http://dashboard.qam.suse.de/api/jobs/incident/{request.param}",
         json=[
             {"job_id": 100000, "status": "passed"},
             {"job_id": 100001, "status": "failed"},

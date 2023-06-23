@@ -24,22 +24,23 @@ class SyncRes:
 
     @classmethod
     def normalize_data(cls, data: Data, job):
-        ret = {}
-        ret["job_id"] = job["id"]
-        ret["incident_settings"] = (
-            data.settings_id if cls.operation == "incident" else None
-        )
-        ret["update_settings"] = (
-            data.settings_id if cls.operation == "aggregate" else None
-        )
-        ret["name"] = job["name"]
-        ret["distri"] = data.distri
-        ret["group_id"] = job["group_id"]
-        ret["job_group"] = job["group"]
-        ret["version"] = data.version
-        ret["arch"] = data.arch
-        ret["flavor"] = data.flavor
-        ret["status"] = normalize_results(job["result"])
+        ret = {
+            "job_id": job["id"],
+            "incident_settings": data.settings_id
+            if cls.operation == "incident"
+            else None,
+            "update_settings": data.settings_id
+            if cls.operation == "aggregate"
+            else None,
+            "name": job["name"],
+            "distri": data.distri,
+            "group_id": job["group_id"],
+            "job_group": job["group"],
+            "version": data.version,
+            "arch": data.arch,
+            "flavor": data.flavor,
+            "status": normalize_results(job["result"]),
+        }
         ret["build"] = data.build
 
         return ret
@@ -54,17 +55,16 @@ class SyncRes:
     def filter_jobs(self, data) -> bool:
         """Filter out invalid/development jobs from results"""
 
-        if not "group" in data:
+        if "group" not in data:
             return False
 
         if data["clone_id"]:
-            log.info("Job '%s' already has a clone, ignoring" % data["clone_id"])
+            log.info(f"""Job '{data["clone_id"]}' already has a clone, ignoring""")
             return False
 
         if self._is_in_devel_group(data):
             log.info(
-                "Ignoring job '%s' in development group '%s'"
-                % (data["id"], data["group"])
+                f"""Ignoring job '{data["id"]}' in development group '{data["group"]}'"""
             )
             return False
 
@@ -72,10 +72,9 @@ class SyncRes:
 
     def post_result(self, result):
         log.debug(
-            "Posting results of %s job %s with status %s"
-            % (self.operation, result["job_id"], result["status"])
+            f'Posting results of {self.operation} job {result["job_id"]} with status {result["status"]}'
         )
-        log.debug("Full post data: %s" % pformat(result))
+        log.debug(f"Full post data: {pformat(result)}")
 
         if not self.dry and self.client:
             post_job(self.token, result)

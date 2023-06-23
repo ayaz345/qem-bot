@@ -15,7 +15,7 @@ log = getLogger("bot.smeltsync")
 class SMELTSync:
     def __init__(self, args: Namespace) -> None:
         self.dry: bool = args.dry
-        self.token: Dict[str, str] = {"Authorization": "Token " + args.token}
+        self.token: Dict[str, str] = {"Authorization": f"Token {args.token}"}
         self.incidents = get_incidents(get_active_incidents())
         self.retry = args.retry
 
@@ -23,57 +23,38 @@ class SMELTSync:
         log.info("Start syncing incidents from smelt to dashboard")
 
         data = self._create_list(self.incidents)
-        log.info("Updating info about %s incidents" % str(len(data)))
-        log.info("Data: %s" % pformat(data))
+        log.info(f"Updating info about {len(data)} incidents")
+        log.info(f"Data: {pformat(data)}")
 
         if not self.dry:
-            ret = update_incidents(self.token, data, retry=self.retry)
-        else:
-            log.info("Dry run, nothing synced")
-            ret = 0
-
-        return ret
+            return update_incidents(self.token, data, retry=self.retry)
+        log.info("Dry run, nothing synced")
+        return 0
 
     @staticmethod
     def _review_rrequest(requestSet):
         if not requestSet:
             return None
-        else:
-            rr = sorted(requestSet, key=itemgetter("requestId"), reverse=True)[0]
-            if rr["status"]["name"] in ("new", "review", "accepted", "revoked"):
-                return rr
-            else:
-                return None
+        rr = sorted(requestSet, key=itemgetter("requestId"), reverse=True)[0]
+        return (
+            rr
+            if rr["status"]["name"] in ("new", "review", "accepted", "revoked")
+            else None
+        )
 
     @staticmethod
     def _is_inreview(rr_number) -> bool:
-        if rr_number["reviewSet"]:
-            if rr_number["status"]["name"] == "review":
-                return True
-            else:
-                return False
-        else:
-            return False
+        return bool(rr_number["reviewSet"] and rr_number["status"]["name"] == "review")
 
     @staticmethod
     def _is_revoked(rr_number) -> bool:
-        if rr_number["reviewSet"]:
-            if rr_number["status"]["name"] == "revoked":
-                return True
-            else:
-                return False
-        else:
-            return False
+        return bool(
+            rr_number["reviewSet"] and rr_number["status"]["name"] == "revoked"
+        )
 
     @staticmethod
     def _is_accepted(rr_number) -> bool:
-        if (
-            rr_number["status"]["name"] == "accepted"
-            or rr_number["status"]["name"] == "new"
-        ):
-            return True
-        else:
-            return False
+        return rr_number["status"]["name"] in ["accepted", "new"]
 
     @staticmethod
     def _has_qam_review(rr_number) -> bool:
@@ -86,9 +67,7 @@ class SMELTSync:
 
     @classmethod
     def _create_record(cls, inc):
-        incident = {}
-        incident["isActive"] = True
-
+        incident = {"isActive": True}
         rr_number = cls._review_rrequest(inc["requestSet"])
         if rr_number:
             inReview = cls._is_inreview(rr_number)

@@ -28,25 +28,22 @@ class Incidents(BaseConf):
 
     @staticmethod
     def normalize_repos(config):
-        ret = {}
-        for flavor, data in config.items():
-            ret[flavor] = {}
-            for key, value in data.items():
-                if key == "issues":
-                    ret[flavor][key] = {
-                        template: ProdVer(channel.split(":")[0], channel.split(":")[1])
-                        for template, channel in value.items()
-                    }
-                else:
-                    ret[flavor][key] = value
-
-        return ret
+        return {
+            flavor: {
+                key: {
+                    template: ProdVer(channel.split(":")[0], channel.split(":")[1])
+                    for template, channel in value.items()
+                }
+                if key == "issues"
+                else value
+                for key, value in data.items()
+            }
+            for flavor, data in config.items()
+        }
 
     @staticmethod
     def _repo_osuse(chan: Repos) -> Union[Repos, Tuple[str, str]]:
-        if chan.product == "openSUSE-SLE":
-            return chan.product, chan.version
-        return chan
+        return (chan.product, chan.version) if chan.product == "openSUSE-SLE" else chan
 
     @staticmethod
     def _is_scheduled_job(
@@ -67,15 +64,15 @@ class Incidents(BaseConf):
         if isinstance(jobs, dict) and "error" in jobs:
             return False
 
-        for job in jobs:
-            if (
+        return any(
+            (
                 job["flavor"] == flavor
                 and job["arch"] == arch
-                and job["settings"]["REPOHASH"] == inc.revisions[ArchVer(arch, ver)]
-            ):
-                return True
-
-        return False
+                and job["settings"]["REPOHASH"]
+                == inc.revisions[ArchVer(arch, ver)]
+            )
+            for job in jobs
+        )
 
     def __call__(
         self,
@@ -91,10 +88,11 @@ class Incidents(BaseConf):
         for flavor, data in self.flavors.items():
             for arch in data["archs"]:
                 for inc in incidents:
-                    full_post: Dict[str, Any] = {}
-                    full_post["api"] = "api/incident_settings"
-                    full_post["qem"] = {}
-                    full_post["openqa"] = {}
+                    full_post: Dict[str, Any] = {
+                        "api": "api/incident_settings",
+                        "qem": {},
+                        "openqa": {},
+                    }
                     full_post["openqa"].update(self.settings)
                     full_post["qem"]["incident"] = inc.id
                     full_post["openqa"]["ARCH"] = arch
@@ -137,8 +135,7 @@ class Incidents(BaseConf):
                         ]
                     except KeyError:
                         log.debug(
-                            "Incident %s does not have %s arch in %s"
-                            % (inc.id, arch, self.settings["VERSION"])
+                            f'Incident {inc.id} does not have {arch} arch in {self.settings["VERSION"]}'
                         )
                         continue
 
@@ -152,9 +149,7 @@ class Incidents(BaseConf):
                             channels_set.add(f_channel)
 
                     if not issue_dict:
-                        log.debug(
-                            "No channels in %s for %s on %s" % (inc.id, flavor, arch)
-                        )
+                        log.debug(f"No channels in {inc.id} for {flavor} on {arch}")
                         continue
 
                     if "required_issues" in data:
@@ -165,8 +160,7 @@ class Incidents(BaseConf):
                         token, inc, arch, self.settings["VERSION"], flavor
                     ):
                         log.info(
-                            "not scheduling: Flavor: %s, version: %s incident: %s , arch: %s  - exists in openQA "
-                            % (flavor, self.settings["VERSION"], inc.id, arch)
+                            f'not scheduling: Flavor: {flavor}, version: {self.settings["VERSION"]} incident: {inc.id} , arch: {arch}  - exists in openQA '
                         )
                         continue
 
@@ -176,19 +170,14 @@ class Incidents(BaseConf):
                         and not flavor.endswith("Azure")
                     ):
                         if set(issue_dict.keys()).isdisjoint(
-                            set(
-                                [
-                                    "OS_TEST_ISSUES",  # standard product dir
-                                    "LTSS_TEST_ISSUES",  # LTSS product dir
-                                    "BASE_TEST_ISSUES",  # GA product dir SLE15+
-                                    "RT_TEST_ISSUES",  # realtime kernel
-                                ]
-                            )
+                            {
+                                "OS_TEST_ISSUES",
+                                "LTSS_TEST_ISSUES",
+                                "BASE_TEST_ISSUES",
+                                "RT_TEST_ISSUES",
+                            }
                         ):
-                            log.warning(
-                                "Kernel incident %s doesn't have product repository"
-                                % str(inc)
-                            )
+                            log.warning(f"Kernel incident {str(inc)} doesn't have product repository")
                             continue
 
                     for key, value in issue_dict.items():
@@ -211,10 +200,10 @@ class Incidents(BaseConf):
 
                         if pos and not pos.isdisjoint(full_post["openqa"].keys()):
                             full_post["qem"]["withAggregate"] = False
-                            log.info("Aggregate not needed for incident %s" % inc.id)
+                            log.info(f"Aggregate not needed for incident {inc.id}")
                         if neg and neg.isdisjoint(full_post["openqa"].keys()):
                             full_post["qem"]["withAggregate"] = False
-                            log.info("Aggregate not needed for incident %s" % inc.id)
+                            log.info(f"Aggregate not needed for incident {inc.id}")
                         if not (neg and pos):
                             full_post["qem"]["withAggregate"] = False
 
@@ -222,9 +211,7 @@ class Incidents(BaseConf):
                     if not self.singlearch.isdisjoint(set(inc.packages)):
                         full_post["qem"]["withAggregate"] = False
 
-                    delta_prio = data.get("override_priority", 0)
-
-                    if delta_prio:
+                    if delta_prio := data.get("override_priority", 0):
                         delta_prio -= 50
                     else:
                         if flavor.endswith("Minimal"):
